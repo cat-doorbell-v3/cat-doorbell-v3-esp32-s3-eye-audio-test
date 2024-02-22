@@ -11,12 +11,11 @@
 
 #include "cat_sounds.h" 
 
-#define TAG "CAT_SOUND_DETECTION"
+#define TAG "MEOW_DETECTOR"
 
 #define I2S_CHANNEL_NUM 1
-#define I2S_CH ((i2s_port_t)1)
 
-static i2s_chan_handle_t rx_handle = NULL;        // I2S rx channel handler
+#define I2S_CH ((i2s_port_t)1)
 
 #define I2S_CONFIG_DEFAULT(sample_rate, channel_fmt, bits_per_chan) { \
         .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(sample_rate), \
@@ -35,6 +34,20 @@ static i2s_chan_handle_t rx_handle = NULL;        // I2S rx channel handler
         }, \
     }
 
+
+static i2s_chan_handle_t rx_handle = NULL;        // I2S rx channel handler
+
+extern "C" void app_main();
+// Other includes and setup code...
+
+namespace {
+  constexpr size_t tensor_arena_size = 100 * 1024; // Adjust as necessary
+  uint8_t tensor_arena[tensor_arena_size];
+  tflite::MicroErrorReporter micro_error_reporter; // Correct declaration of the error reporter
+  tflite::MicroInterpreter* interpreter = nullptr;
+  tflite::MicroMutableOpResolver<10> resolver; // Adjust the number based on the ops you need
+}
+
 static esp_err_t i2s_init(i2s_port_t i2s_num, uint32_t sample_rate, int channel_format, int bits_per_chan) {
     esp_err_t ret_val = ESP_OK;
 
@@ -50,16 +63,6 @@ static esp_err_t i2s_init(i2s_port_t i2s_num, uint32_t sample_rate, int channel_
     return ret_val;
 }
 
-extern "C" void app_main();
-// Other includes and setup code...
-
-namespace {
-  constexpr size_t tensor_arena_size = 100 * 1024; // Adjust as necessary
-  uint8_t tensor_arena[tensor_arena_size];
-  tflite::MicroErrorReporter micro_error_reporter; // Correct declaration of the error reporter
-  tflite::MicroInterpreter* interpreter = nullptr;
-  tflite::MicroMutableOpResolver<10> resolver; // Adjust the number based on the ops you need
-}
 
 void setup() {
     const tflite::Model* model = tflite::GetModel(cat_sounds);
@@ -124,6 +127,13 @@ void capture_and_infer(void* pvParameters) {
 
     while (true) {
         i2s_channel_read(rx_handle, &buffer, sizeof(buffer), &bytes_read, portMAX_DELAY);
+
+        long long sum = 0;
+        for (int i = 0; i < sizeof(buffer) / sizeof(buffer[0]); ++i) {
+            sum += abs(buffer[i]); // Summing absolute values to calculate the amplitude
+        }
+        float average_amplitude = (float)sum / (sizeof(buffer) / sizeof(buffer[0]));
+        ESP_LOGI(TAG, "Average amplitude: %f", average_amplitude);
 
         // Prepare input tensor
         TfLiteTensor* input_tensor = interpreter->input(0);
