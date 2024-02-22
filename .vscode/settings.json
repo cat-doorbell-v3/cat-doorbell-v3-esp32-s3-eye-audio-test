@@ -1,5 +1,7 @@
 {
     "files.associations": {
         "cstdlib": "cpp"
-    }
+    },
+    "idf.adapterTargetName": "esp32s3",
+    "sonarlint.pathToCompileCommands": "${workspaceFolder}/build/compile_commands.json"
 }
