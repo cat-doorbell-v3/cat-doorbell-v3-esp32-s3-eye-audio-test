@@ -2,20 +2,21 @@ dependencies:
   espressif/esp-nn:
     component_hash: b32869798bdb40dec6bc99caca48cd65d42f8a9f506b9ab9c598a076f891ede9
     source:
+      pre_release: true
       service_url: https://api.components.espressif.com/
       type: service
     version: 1.0.2
   espressif/esp-tflite-micro:
-    component_hash: ffe40b7edc5f407f82a55047b7269c036c25106ff830fb9b3231f3b7fecb4915
+    component_hash: null
     source:
-      service_url: https://api.components.espressif.com/
-      type: service
-    version: 1.2.0
+      path: /Users/tennis/esp/esp-tflite-micro
+      type: local
+    version: '*'
   idf:
     component_hash: null
     source:
       type: idf
     version: 5.2.0
-manifest_hash: b64a773684ff5b3c374ba19e5fbc3c2a50e95962c8605ae9181a57eb39470abf
+manifest_hash: f92c3ed52c12ad83f8f7dca2d7ce2790e3c268c43f2e8f463e4b0e11ba9a69e3
 target: esp32s3
 version: 1.0.0
