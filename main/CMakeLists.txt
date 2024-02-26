@@ -7,6 +7,7 @@ idf_component_register(
     SRCS 
         main.cc 
         main_functions.cc 
+        sd_card_provider.cc
         audio_provider.cc 
         feature_provider.cc
         no_micro_features_data.cc 

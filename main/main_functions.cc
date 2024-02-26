@@ -39,8 +39,8 @@ limitations under the License.
 #include "sdmmc_cmd.h"
 #include "driver/sdmmc_host.h"
 #include "driver/sdmmc_default_configs.h"
+#include "sd_card_provider.h"
 
-#define MOUNT_POINT "/sdcard"
 #define MODEL_FILENAME MOUNT_POINT"/CAT_MOD.TFL"
 #define TAG "main_functions"
 
@@ -64,25 +64,6 @@ namespace {
     int8_t* model_input_buffer = nullptr;
 }  // namespace
 
-void list_dir(const char *path) {
-    DIR *dir = opendir(path);
-    if (dir == NULL) {
-        ESP_LOGE(TAG, "Failed to open directory %s", path);
-        return;
-    }
-
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != NULL) {
-        // Check if it's a directory or a file
-        if (entry->d_type == DT_DIR) {
-            ESP_LOGI(TAG, "Directory: %s", entry->d_name);
-        } else {
-            ESP_LOGI(TAG, "File: %s", entry->d_name);
-        }
-    }
-    closedir(dir);
-}
-
 void setup() {
     ESP_LOGI(TAG, "Allocate tensor_arena in PSRAM");
     tensor_arena = (uint8_t*)heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_SPIRAM);
@@ -92,42 +73,15 @@ void setup() {
         return;
     }
 
-   ESP_LOGI(TAG, "Initializing SD card");
+    SDCardProvider& sdCardProvider = SDCardProvider::getInstance();
 
-    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
-    host.flags = SDMMC_HOST_FLAG_1BIT; // Specify the 1-bit mode
-
-    sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
-    slot_config.width = 1; // Set the slot width to 1-bit
-    // Manually configure the GPIOs used for SDMMC interface
-    slot_config.clk = (gpio_num_t)39;
-    slot_config.cmd = (gpio_num_t)38;
-    slot_config.d0 = (gpio_num_t)40;
-   
-    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
-        .format_if_mount_failed = false,
-        .max_files = 5,
-        .allocation_unit_size = 32 * 1024
-    };
-
-    ESP_LOGI(TAG, "Mounting SD card");
-    sdmmc_card_t* card;
-    esp_err_t ret = esp_vfs_fat_sdmmc_mount(MOUNT_POINT, &host, &slot_config, &mount_config, &card);
-
-    ESP_LOGI(TAG, "Checking mount status");
-    if (ret != ESP_OK) {
-        if (ret == ESP_FAIL) {
-            ESP_LOGE(TAG, "Failed to mount filesystem. If you want the card to be formatted, set format_if_mount_failed = true.");
-        } else {
-            ESP_LOGE(TAG, "Failed to initialize the card (%s). Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(ret));
-        }
-        return;
+    // Initialize the SD card
+    if (sdCardProvider.initialize() == ESP_OK) {
+        // List the directory contents
+        sdCardProvider.listDir("/sdcard/");
+    } else {
+        ESP_LOGE("SDCardProvider", "Initialization failed");
     }
-
-    // Card has been successfully mounted
-    ESP_LOGI(TAG, "SD card mounted successfully");
-
-    list_dir(MOUNT_POINT);
 
     // Read the model into a buffer
     ESP_LOGI(TAG, "Reading model from SD card: %s", MODEL_FILENAME);
@@ -152,7 +106,6 @@ void setup() {
   } else {
     ESP_LOGI(TAG, "Heap integrity check passed");
   }
-
 
   uint8_t* model_buffer = (uint8_t*)heap_caps_malloc(model_size, MALLOC_CAP_SPIRAM); 
   if (model_buffer == nullptr) {
@@ -270,7 +223,6 @@ void setup() {
 // The name of this function is important for Arduino compatibility.
 void loop() {
   // Fetch the spectrogram for the current time.
-  ESP_LOGI(TAG, "Fetch spectrogram");
   const int32_t current_time = LatestAudioTimestamp();
   int how_many_new_slices = 0;
   TfLiteStatus feature_status = feature_provider->PopulateFeatureData(
@@ -315,7 +267,5 @@ void loop() {
   }
   if (max_result > 0.8f) {
     ESP_LOGW(TAG, "Detected %7s, score: %.2f", kCategoryLabels[max_idx], static_cast<double>(max_result));
-  } else {
-    ESP_LOGI(TAG, "Detected %7s, score: %.2f", kCategoryLabels[max_idx], static_cast<double>(max_result));
-  }
+  } 
 }

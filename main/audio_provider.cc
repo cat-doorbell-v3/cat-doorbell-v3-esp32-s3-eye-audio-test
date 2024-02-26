@@ -32,6 +32,7 @@ limitations under the License.
 #include "freertos/task.h"
 #include "ringbuf.h"
 #include "micro_model_settings.h"
+#include "sd_card_provider.h"
 
 using namespace std;
 
@@ -63,19 +64,10 @@ int16_t g_audio_output_buffer[kMaxAudioSampleSize * 32];
 bool g_is_audio_initialized = false;
 int16_t g_history_buffer[history_samples_to_keep];
 
-#if !NO_I2S_SUPPORT
 uint8_t g_i2s_read_buffer[i2s_bytes_to_read] = {};
-#if CONFIG_IDF_TARGET_ESP32
-i2s_port_t i2s_port = I2S_NUM_1; // for esp32-eye
-#else
 i2s_port_t i2s_port = I2S_NUM_0; // for esp32-s3-eye
-#endif
-#endif
 }  // namespace
 
-#if NO_I2S_SUPPORT
-  // nothing to be done here
-#else
 static void i2s_init(void) {
   // Start listening for audio: MONO @ 16KHz
   i2s_config_t i2s_config = {
@@ -91,7 +83,6 @@ static void i2s_init(void) {
       .tx_desc_auto_clear = false,
       .fixed_mclk = -1,
   };
-#if CONFIG_IDF_TARGET_ESP32S3
   i2s_pin_config_t pin_config = {
       .bck_io_num = 41,    // IIS_SCLK
       .ws_io_num = 42,     // IIS_LCLK
@@ -99,14 +90,6 @@ static void i2s_init(void) {
       .data_in_num = 2,   // IIS_DOUT
   };
   i2s_config.bits_per_sample = (i2s_bits_per_sample_t) 32;
-#else
-  i2s_pin_config_t pin_config = {
-      .bck_io_num = 26,    // IIS_SCLK
-      .ws_io_num = 32,     // IIS_LCLK
-      .data_out_num = -1,  // IIS_DSIN
-      .data_in_num = 33,   // IIS_DOUT
-  };
-#endif
 
   esp_err_t ret = 0;
   ret = i2s_driver_install(i2s_port, &i2s_config, 0, NULL);
@@ -123,51 +106,79 @@ static void i2s_init(void) {
     ESP_LOGE(TAG, "Error in initializing dma buffer with 0");
   }
 }
-#endif
 
 static void CaptureSamples(void* arg) {
-#if NO_I2S_SUPPORT
-  ESP_LOGE(TAG, "i2s support not available on C3 chip for IDF < 4.4.0");
-#else
-  size_t bytes_read = i2s_bytes_to_read;
-  i2s_init();
-  while (1) {
-    /* read 100ms data at once from i2s */
-    i2s_read(i2s_port, (void*)g_i2s_read_buffer, i2s_bytes_to_read,
-             &bytes_read, pdMS_TO_TICKS(100));
-
-    if (bytes_read <= 0) {
-      ESP_LOGE(TAG, "Error in I2S read : %d", bytes_read);
+    size_t bytes_read = i2s_bytes_to_read;
+    SDCardProvider& sdCardProvider = SDCardProvider::getInstance();
+  
+    // Initialize the SD card
+    if (sdCardProvider.initialize() == ESP_OK) {
+        // List the directory contents
+        sdCardProvider.listDir("/sdcard/");
     } else {
-      if (bytes_read < i2s_bytes_to_read) {
-        ESP_LOGW(TAG, "Partial I2S read");
-      }
-#if CONFIG_IDF_TARGET_ESP32S3
-      // rescale the data
-      for (int i = 0; i < bytes_read / 4; ++i) {
-        ((int16_t *) g_i2s_read_buffer)[i] = ((int32_t *) g_i2s_read_buffer)[i] >> 14;
-      }
-      bytes_read = bytes_read / 2;
-#endif
-      /* write bytes read by i2s into ring buffer */
-      int bytes_written = rb_write(g_audio_capture_buffer,
-                                   (uint8_t*)g_i2s_read_buffer, bytes_read, pdMS_TO_TICKS(100));
-      if (bytes_written != bytes_read) {
-        ESP_LOGI(TAG, "Could only write %d bytes out of %d", bytes_written, bytes_read);
-      }
-      /* update the timestamp (in ms) to let the model know that new data has
-       * arrived */
-      g_latest_audio_timestamp = g_latest_audio_timestamp +
-          ((1000 * (bytes_written / 2)) / kAudioSampleFrequency);
-      if (bytes_written <= 0) {
-        ESP_LOGE(TAG, "Could Not Write in Ring Buffer: %d ", bytes_written);
-      } else if (bytes_written < bytes_read) {
-        ESP_LOGW(TAG, "Partial Write");
-      }
+        ESP_LOGE("SDCardProvider", "Initialization failed");
     }
-  }
-#endif
-  vTaskDelete(NULL);
+  
+    i2s_init();
+
+    char fileName[64]; // Buffer for filename
+    FILE* f = NULL; // File handle for writing audio data
+  
+    while (1) {
+        /* read 100ms data at once from i2s */
+        i2s_read(i2s_port, (void*)g_i2s_read_buffer, i2s_bytes_to_read, &bytes_read, pdMS_TO_TICKS(100));
+  
+        // if (bytes_read > 0) {
+        //    ESP_LOGI(TAG, "Read %d bytes from I2S", bytes_read);
+        // } 
+        if (bytes_read > 0) {
+            // Open a new file for each set of samples based on the current timestamp
+            snprintf(fileName, sizeof(fileName), "/sdcard/audio_%ld.raw", g_latest_audio_timestamp);
+            f = fopen(fileName, "wb");
+            if (!f) {
+                ESP_LOGE(TAG, "Failed to open file for writing: %s", fileName);
+                continue; // Skip this round if file opening fails
+            }
+
+            // Write the raw bytes read directly to the file
+            if (fwrite(g_i2s_read_buffer, 1, bytes_read, f) != bytes_read) {
+                ESP_LOGE(TAG, "Failed to write data to file: %s", fileName);
+            }
+
+            fclose(f); // Close the file after writing is complete
+        }
+  
+        if (bytes_read <= 0) {
+            ESP_LOGE(TAG, "Error in I2S read : %d", bytes_read);
+        } else {
+            if (bytes_read < i2s_bytes_to_read) {
+              ESP_LOGW(TAG, "Partial I2S read");
+            }
+            // rescale the data
+            for (int i = 0; i < bytes_read / 4; ++i) {
+              ((int16_t *) g_i2s_read_buffer)[i] = ((int32_t *) g_i2s_read_buffer)[i] >> 14;
+            }
+            bytes_read = bytes_read / 2;
+    
+            /* write bytes read by i2s into ring buffer */
+            int bytes_written = rb_write(g_audio_capture_buffer, (uint8_t*)g_i2s_read_buffer, bytes_read, pdMS_TO_TICKS(100));
+    
+            if (bytes_written != bytes_read) {
+              ESP_LOGI(TAG, "Could only write %d bytes out of %d", bytes_written, bytes_read);
+            }
+            /* update the timestamp (in ms) to let the model know that new data has
+             * arrived */
+            g_latest_audio_timestamp = g_latest_audio_timestamp + ((1000 * (bytes_written / 2)) / kAudioSampleFrequency);
+            // ESP_LOGI(TAG, "Updated timestamp: %ld", g_latest_audio_timestamp);
+    
+            if (bytes_written <= 0) {
+              ESP_LOGE(TAG, "Could Not Write in Ring Buffer: %d ", bytes_written);
+            } else if (bytes_written < bytes_read) {
+              ESP_LOGW(TAG, "Partial Write");
+            }
+        }
+    }
+    vTaskDelete(NULL);
 }
 
 TfLiteStatus InitAudioRecording() {
