@@ -109,44 +109,12 @@ static void i2s_init(void) {
 
 static void CaptureSamples(void* arg) {
     size_t bytes_read = i2s_bytes_to_read;
-    SDCardProvider& sdCardProvider = SDCardProvider::getInstance();
-  
-    // Initialize the SD card
-    if (sdCardProvider.initialize() == ESP_OK) {
-        // List the directory contents
-        sdCardProvider.listDir("/sdcard/");
-    } else {
-        ESP_LOGE("SDCardProvider", "Initialization failed");
-    }
   
     i2s_init();
-
-    char fileName[64]; // Buffer for filename
-    FILE* f = NULL; // File handle for writing audio data
   
     while (1) {
         /* read 100ms data at once from i2s */
         i2s_read(i2s_port, (void*)g_i2s_read_buffer, i2s_bytes_to_read, &bytes_read, pdMS_TO_TICKS(100));
-  
-        // if (bytes_read > 0) {
-        //    ESP_LOGI(TAG, "Read %d bytes from I2S", bytes_read);
-        // } 
-        if (bytes_read > 0) {
-            // Open a new file for each set of samples based on the current timestamp
-            snprintf(fileName, sizeof(fileName), "/sdcard/audio_%ld.raw", g_latest_audio_timestamp);
-            f = fopen(fileName, "wb");
-            if (!f) {
-                ESP_LOGE(TAG, "Failed to open file for writing: %s", fileName);
-                continue; // Skip this round if file opening fails
-            }
-
-            // Write the raw bytes read directly to the file
-            if (fwrite(g_i2s_read_buffer, 1, bytes_read, f) != bytes_read) {
-                ESP_LOGE(TAG, "Failed to write data to file: %s", fileName);
-            }
-
-            fclose(f); // Close the file after writing is complete
-        }
   
         if (bytes_read <= 0) {
             ESP_LOGE(TAG, "Error in I2S read : %d", bytes_read);

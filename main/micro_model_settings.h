@@ -16,11 +16,12 @@ limitations under the License.
 #ifndef TENSORFLOW_LITE_MICRO_EXAMPLES_MICRO_SPEECH_MICRO_MODEL_SETTINGS_H_
 #define TENSORFLOW_LITE_MICRO_EXAMPLES_MICRO_SPEECH_MICRO_MODEL_SETTINGS_H_
 
+
 constexpr int kMaxAudioSampleSize = 2028;
 constexpr int kAudioSampleFrequency = 44100;
 constexpr int kFeatureSize = 13;
-constexpr int kFeatureCount = 275;
-constexpr int kFeatureElementCount = 3575;
+constexpr int kFeatureCount = 622;
+constexpr int kFeatureElementCount = 8086;
 constexpr int kFeatureStrideMs = 11;
 constexpr int kFeatureDurationMs = 46;
 

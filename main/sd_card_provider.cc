@@ -34,6 +34,12 @@ SDCardProvider::~SDCardProvider() {
 }
 
 esp_err_t SDCardProvider::initialize() {
+
+    if (card != nullptr) {
+        ESP_LOGI(TAG, "SD card is already initialized.");
+        return ESP_OK; // Card is already initialized
+    }
+
     ESP_LOGI(TAG, "Initializing SD card");
 
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
