@@ -196,7 +196,7 @@ void setup() {
   
     if ((model_input->dims->size != 4) || 
       (model_input->dims->data[0] != 1) ||
-      (model_input->dims->data[1] != 313) ||
+      (model_input->dims->data[1] != 345) ||
       (model_input->dims->data[2] != 13) ||
       (model_input->dims->data[3] != 1) || 
       (model_input->type != kTfLiteInt8)) {

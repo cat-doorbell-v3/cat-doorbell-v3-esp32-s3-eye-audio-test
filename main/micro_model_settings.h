@@ -17,26 +17,21 @@ limitations under the License.
 #define TENSORFLOW_LITE_MICRO_EXAMPLES_MICRO_SPEECH_MICRO_MODEL_SETTINGS_H_
 
 
-constexpr int kMaxAudioSampleSize = 2028;
-constexpr int kAudioSampleFrequency = 44100;
-constexpr int kFeatureSize = 13;
-constexpr int kFeatureCount = 622;
-constexpr int kFeatureElementCount = 8086;
-constexpr int kFeatureStrideMs = 11;
-constexpr int kFeatureDurationMs = 46;
 
-constexpr int kCategoryCount = 10;
+constexpr int kMaxAudioSampleSize = 512;
+constexpr int kAudioSampleFrequency = 8000;
+constexpr int kFeatureSize = 13;
+constexpr int kFeatureCount = 56;
+constexpr int kFeatureElementCount = 728;
+constexpr int kFeatureStrideMs = 32;
+constexpr int kFeatureDurationMs = 64;
+
+constexpr int kCategoryCount = 3;
 constexpr const char* kCategoryLabels[kCategoryCount] = {
-    "Angry",
-    "Defense",
-    "Fighting",
-    "Happy",
-    "HuntingMind",
-    "Mating",
-    "MotherCall",
-    "Paining",
-    "Resting",
-    "Warning",
+    "brushing",
+    "isolation",
+    "food",
 };
+
 
 #endif  // TENSORFLOW_LITE_MICRO_EXAMPLES_MICRO_SPEECH_MICRO_MODEL_SETTINGS_H_
