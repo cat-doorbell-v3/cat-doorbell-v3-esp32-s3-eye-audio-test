@@ -18,8 +18,7 @@ limitations under the License.
 #include <iterator>
 #include "esp_log.h"
 #include <errno.h>
-#include <string.h> // For strerror()
-#include <dirent.h> // Directory Entry
+#include <string.h> 
 #include <sys/stat.h>
 #include "main_functions.h"
 #include "esp_heap_caps.h"
@@ -114,12 +113,6 @@ void setup() {
     
     // Log the second dimension data
     ESP_LOGI(TAG, "Dims data[1]: %d", model_input->dims->data[1]);
-
-    // Log the second dimension data
-    // ESP_LOGI(TAG, "Dims data[2]: %d", model_input->dims->data[2]);
-
-     // Log the second dimension data
-    // ESP_LOGI(TAG, "Dims data[3]: %d", model_input->dims->data[3]);
      
     // Log the expected second dimension size for comparison
     ESP_LOGI(TAG, "Expecting Dims data[1] to be (kFeatureCount * kFeatureSize): %d", kFeatureCount * kFeatureSize);
