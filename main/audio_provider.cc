@@ -32,7 +32,6 @@ limitations under the License.
 #include "freertos/task.h"
 #include "ringbuf.h"
 #include "micro_model_settings.h"
-#include "sd_card_provider.h"
 
 using namespace std;
 

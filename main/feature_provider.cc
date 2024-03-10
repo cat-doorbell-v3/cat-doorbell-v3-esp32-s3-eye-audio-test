@@ -26,10 +26,7 @@ limitations under the License.
 #include "micro_model_settings.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
-// extern const uint8_t no_30ms_start[]          asm("_binary_no_30ms_wav_start");
-// extern const uint8_t yes_30ms_start[]         asm("_binary_yes_30ms_wav_start");
-extern const uint8_t yes_1000ms_start[]       asm("_binary_yes_1000ms_wav_start");
-extern const uint8_t no_1000ms_start[]        asm("_binary_no_1000ms_wav_start");
+extern const uint8_t meow_1000ms_start[]      asm("_binary_meow_1000ms_wav_start");
 extern const uint8_t noise_1000ms_start[]     asm("_binary_noise_1000ms_wav_start");
 extern const uint8_t silence_1000ms_start[]   asm("_binary_silence_1000ms_wav_start");
 
@@ -72,7 +69,7 @@ TfLiteStatus FeatureProvider::PopulateFeatureData(
     is_first_run_ = false;
     slices_needed = kFeatureCount;
   }
-#if 1
+
   if (slices_needed > kFeatureCount) {
     slices_needed = kFeatureCount;
   }
@@ -139,7 +136,6 @@ TfLiteStatus FeatureProvider::PopulateFeatureData(
       }
     }
   }
-#elif 1
     *how_many_new_slices = kFeatureCount;
     int16_t* audio_samples = nullptr;
     int audio_samples_size = 0;
@@ -147,18 +143,18 @@ TfLiteStatus FeatureProvider::PopulateFeatureData(
     static int cnt = 0;
     audio_samples = (int16_t *) (silence_1000ms_start + 44);
 
-    switch(cnt++ % 4) {
+    switch(cnt++ % 3) {
       case 0:
-        audio_samples = (int16_t *) (yes_1000ms_start + 44);
+        audio_samples = (int16_t *) (meow_1000ms_start + 44);
+        ESP_LOGI(TAG, "meow");
         break;
       case 1:
-        audio_samples = (int16_t *) (no_1000ms_start + 44);
+        audio_samples = (int16_t *) (noise_1000ms_start + 44);
+        ESP_LOGI(TAG, "noise");
         break;
       case 2:
-        audio_samples = (int16_t *) (noise_1000ms_start + 44);
-        break;
-      case 3:
         audio_samples = (int16_t *) (silence_1000ms_start + 44);
+        ESP_LOGI(TAG, "silence");
         break;
       default:
         break;
@@ -179,26 +175,5 @@ TfLiteStatus FeatureProvider::PopulateFeatureData(
       }
     }
     vTaskDelay(pdMS_TO_TICKS(500));
-#else
-    *how_many_new_slices = kFeatureCount;
-    int16_t* audio_samples = nullptr;
-    int audio_samples_size = 16000;
-    GetAudioSamples(0, kFeatureDurationMs, &audio_samples_size, &audio_samples);
-
-    memset(g_features, 0, sizeof(g_features));
-
-    TfLiteStatus generate_status = GenerateFeatures(
-          audio_samples, audio_samples_size, &g_features);
-    if (generate_status != kTfLiteOk) {
-      return generate_status;
-    }
-    // copy features
-    for (int i = 0; i < kFeatureCount; ++i) {
-      for (int j = 0; j < kFeatureSize; ++j) {
-        feature_data_[i * kFeatureSize + j] = g_features[i][j];
-      }
-    }
-    vTaskDelay(pdMS_TO_TICKS(500));
-#endif
   return kTfLiteOk;
 }

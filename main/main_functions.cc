@@ -35,13 +35,8 @@ limitations under the License.
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 
-#include "esp_vfs_fat.h"
-#include "sdmmc_cmd.h"
-#include "driver/sdmmc_host.h"
-#include "driver/sdmmc_default_configs.h"
-#include "sd_card_provider.h"
+#include "model.h"
 
-#define MODEL_FILENAME MOUNT_POINT"/CAT_MDL.TFL"
 #define TAG "main_functions"
 
 // Globals, used for compatibility with Arduino-style sketches.
@@ -56,76 +51,18 @@ namespace {
     // Create an area of memory to use for input, output, and intermediate arrays.
     // The size of this will depend on the model you're using, and may need to be
     // determined by experimentation.
-    constexpr int kTensorArenaSize = 96 * 1024;
-    // uint8_t tensor_arena[kTensorArenaSize];
-    uint8_t* tensor_arena = nullptr;
-
+    constexpr int kTensorArenaSize = 60 * 1024;
+    uint8_t tensor_arena[kTensorArenaSize];
     int8_t feature_buffer[kFeatureElementCount];
     int8_t* model_input_buffer = nullptr;
 }  // namespace
 
 void setup() {
-    ESP_LOGI(TAG, "Allocate tensor_arena in PSRAM");
-    tensor_arena = (uint8_t*)heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_SPIRAM);
-    if (tensor_arena == nullptr) {
-        // Handle allocation failure
-        ESP_LOGE(TAG, "Failed to allocate tensor arena in PSRAM");
-        return;
-    }
+    model = tflite::GetModel(g_model);
 
-    SDCardProvider& sdCardProvider = SDCardProvider::getInstance();
-
-    // Initialize the SD card
-    if (sdCardProvider.initialize() != ESP_OK) {
-        ESP_LOGE("SDCardProvider", "Initialization failed");
-    }
-
-    // Read the model into a buffer
-    ESP_LOGI(TAG, "Reading model from SD card: %s", MODEL_FILENAME);
-    FILE* file = fopen(MODEL_FILENAME, "rb");
-    if (file == nullptr) {
-        ESP_LOGE(TAG, "Failed to open model file, errno = %d, %s", errno, strerror(errno));
-        esp_vfs_fat_sdmmc_unmount();
-        return;
-    }
-
-    fseek(file, 0, SEEK_END);
-    long model_size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-  
-    ESP_LOGI(TAG, "Free heap size before allocation: %lu", esp_get_free_heap_size());
-  
-    ESP_LOGI(TAG, "Model size: %lu", model_size);
-  
-    if (!heap_caps_check_integrity(MALLOC_CAP_DEFAULT, true)) {
-      ESP_LOGE(TAG, "Heap corruption detected");
-      return;
-    } 
-  
-    uint8_t* model_buffer = (uint8_t*)heap_caps_malloc(model_size, MALLOC_CAP_SPIRAM); 
-    if (model_buffer == nullptr) {
-        ESP_LOGE(TAG, "Failed to allocate memory for model");
-        fclose(file);
-        return;
-    }
-  
-    size_t read_size = fread(model_buffer, 1, model_size, file);
-    fclose(file);
-
-    if (read_size != model_size) {
-        ESP_LOGE(TAG, "Failed to read the model correctly");
-        heap_caps_free(model_buffer);
-        return;
-    }
-  
-    ESP_LOGI(TAG, "Use TensorFlow Lite Micro to interpret the model");
-  
-    // Use TensorFlow Lite Micro to interpret the model
-    model = tflite::GetModel(model_buffer);
     if (model->version() != TFLITE_SCHEMA_VERSION) {
       ESP_LOGE(TAG, "Model provided is schema version %lu not equal to supported version %d.", 
               model->version(), TFLITE_SCHEMA_VERSION);
-      free(model_buffer);
       return;
     }
     // Pull in only the operation implementations we need.
@@ -149,19 +86,12 @@ void setup() {
     if (micro_op_resolver.AddReshape() != kTfLiteOk) {
       return;
     }
-    if (micro_op_resolver.AddQuantize() != kTfLiteOk) {
-      return;
-    }
     if (micro_op_resolver.AddConv2D() != kTfLiteOk) {
-      return;
-    }
-    if (micro_op_resolver.AddMaxPool2D() != kTfLiteOk) {
       return;
     }
   
     // Build an interpreter to run the model with.
-    static tflite::MicroInterpreter static_interpreter(
-        model, micro_op_resolver, tensor_arena, kTensorArenaSize);
+    static tflite::MicroInterpreter static_interpreter(model, micro_op_resolver, tensor_arena, kTensorArenaSize);
     interpreter = &static_interpreter;
   
     ESP_LOGI(TAG, "AllocateTensors()");
@@ -184,23 +114,27 @@ void setup() {
     
     // Log the second dimension data
     ESP_LOGI(TAG, "Dims data[1]: %d", model_input->dims->data[1]);
-    
+
+    // Log the second dimension data
+    // ESP_LOGI(TAG, "Dims data[2]: %d", model_input->dims->data[2]);
+
+     // Log the second dimension data
+    // ESP_LOGI(TAG, "Dims data[3]: %d", model_input->dims->data[3]);
+     
     // Log the expected second dimension size for comparison
-    ESP_LOGI(TAG, "Expected Dims data[1] (kFeatureCount * kFeatureSize): %d", kFeatureCount * kFeatureSize);
+    ESP_LOGI(TAG, "Expecting Dims data[1] to be (kFeatureCount * kFeatureSize): %d", kFeatureCount * kFeatureSize);
     
     // Log the data type
     ESP_LOGI(TAG, "Data type: %d", model_input->type);
     
     // Log the expected data type for comparison
-    ESP_LOGI(TAG, "Expected Data type (kTfLiteInt8): %d", kTfLiteInt8);
+    ESP_LOGI(TAG, "Expecting Data type (kTfLiteInt8): %d", kTfLiteInt8);
   
-    if ((model_input->dims->size != 4) || 
+    if ((model_input->dims->size != 2) || 
       (model_input->dims->data[0] != 1) ||
-      (model_input->dims->data[1] != 345) ||
-      (model_input->dims->data[2] != 13) ||
-      (model_input->dims->data[3] != 1) || 
+      (model_input->dims->data[1] != (kFeatureCount * kFeatureSize)) ||
       (model_input->type != kTfLiteInt8)) {
-      MicroPrintf("Bad input tensor parameters in model");
+      ESP_LOGE(TAG, "Bad input tensor parameters in model");
       return;
     }
 
@@ -223,8 +157,7 @@ void loop() {
     // Fetch the spectrogram for the current time.
     const int32_t current_time = LatestAudioTimestamp();
     int how_many_new_slices = 0;
-    TfLiteStatus feature_status = feature_provider->PopulateFeatureData(
-        previous_time, current_time, &how_many_new_slices);
+    TfLiteStatus feature_status = feature_provider->PopulateFeatureData(previous_time, current_time, &how_many_new_slices);
     if (feature_status != kTfLiteOk) {
       MicroPrintf( "Feature generation failed");
       return;
@@ -250,20 +183,39 @@ void loop() {
   
     // Obtain a pointer to the output tensor
     TfLiteTensor* output = interpreter->output(0);
-  
-    float output_scale = output->params.scale;
-    int output_zero_point = output->params.zero_point;
-    int max_idx = 0;
-    float max_result = 0.0;
-    // Dequantize output values and find the max
-    for (int i = 0; i < kCategoryCount; i++) {
-      float current_result = (tflite::GetTensorData<int8_t>(output)[i] - output_zero_point) * output_scale;
-      if (current_result > max_result) {
-        max_result = current_result; // update max result
-        max_idx = i; // update category
-      }
+#if 0 // using simple argmax instead of recognizer
+  float output_scale = output->params.scale;
+  int output_zero_point = output->params.zero_point;
+  int max_idx = 0;
+  float max_result = 0.0;
+  // Dequantize output values and find the max
+  for (int i = 0; i < kCategoryCount; i++) {
+    float current_result =
+        (tflite::GetTensorData<int8_t>(output)[i] - output_zero_point) *
+        output_scale;
+    if (current_result > max_result) {
+      max_result = current_result; // update max result
+      max_idx = i; // update category
     }
-    if (max_result > 0.8f) {
-      ESP_LOGW(TAG, "Detected %7s, score: %.2f", kCategoryLabels[max_idx], static_cast<double>(max_result));
-    } 
+  }
+  if (max_result > 0.8f) {
+    MicroPrintf("Detected %7s, score: %.2f", kCategoryLabels[max_idx],
+        static_cast<double>(max_result));
+  }
+#else
+  // Determine whether a command was recognized based on the output of inference
+  const char* found_command = nullptr;
+  float score = 0;
+  bool is_new_command = false;
+  TfLiteStatus process_status = recognizer->ProcessLatestResults(
+      output, current_time, &found_command, &score, &is_new_command);
+  if (process_status != kTfLiteOk) {
+    MicroPrintf("RecognizeCommands::ProcessLatestResults() failed");
+    return;
+  }
+  // Do something based on the recognized command. The default implementation
+  // just prints to the error console, but you should replace this with your
+  // own function for a real application.
+  RespondToCommand(current_time, found_command, score, is_new_command);
+#endif
 }

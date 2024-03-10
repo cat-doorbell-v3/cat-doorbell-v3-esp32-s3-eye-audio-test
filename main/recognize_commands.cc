@@ -39,8 +39,7 @@ TfLiteStatus RecognizeCommands::ProcessLatestResults(
     MicroPrintf(
         "The results for recognition should contain %d elements, but there are "
         "%d in an %d-dimensional shape",
-        kCategoryCount, latest_results->dims->data[1],
-        latest_results->dims->size);
+        kCategoryCount, latest_results->dims->data[1], latest_results->dims->size);
     return kTfLiteError;
   }
 
