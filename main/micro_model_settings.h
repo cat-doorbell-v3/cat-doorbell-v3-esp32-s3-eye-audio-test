@@ -34,9 +34,10 @@ constexpr int kFeatureElementCount = 1960;
 constexpr int kFeatureStrideMs = 20;
 constexpr int kFeatureDurationMs = 30;
 
-constexpr int kCategoryCount = 1;
+constexpr int kCategoryCount = 2;
 constexpr const char* kCategoryLabels[kCategoryCount] = { 
     "meow" 
+    "unknown"
     };
 
 #endif  // TENSORFLOW_LITE_MICRO_EXAMPLES_MICRO_SPEECH_MICRO_MODEL_SETTINGS_H_
