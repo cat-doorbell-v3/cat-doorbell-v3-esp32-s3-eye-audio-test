@@ -63,10 +63,19 @@ int16_t g_audio_output_buffer[kMaxAudioSampleSize * 32];
 bool g_is_audio_initialized = false;
 int16_t g_history_buffer[history_samples_to_keep];
 
+#if !NO_I2S_SUPPORT
 uint8_t g_i2s_read_buffer[i2s_bytes_to_read] = {};
+#if CONFIG_IDF_TARGET_ESP32
+i2s_port_t i2s_port = I2S_NUM_1; // for esp32-eye
+#else
 i2s_port_t i2s_port = I2S_NUM_0; // for esp32-s3-eye
+#endif
+#endif
 }  // namespace
 
+#if NO_I2S_SUPPORT
+  // nothing to be done here
+#else
 static void i2s_init(void) {
   // Start listening for audio: MONO @ 16KHz
   i2s_config_t i2s_config = {
@@ -82,6 +91,7 @@ static void i2s_init(void) {
       .tx_desc_auto_clear = false,
       .fixed_mclk = -1,
   };
+#if CONFIG_IDF_TARGET_ESP32S3
   i2s_pin_config_t pin_config = {
       .bck_io_num = 41,    // IIS_SCLK
       .ws_io_num = 42,     // IIS_LCLK
@@ -89,6 +99,14 @@ static void i2s_init(void) {
       .data_in_num = 2,   // IIS_DOUT
   };
   i2s_config.bits_per_sample = (i2s_bits_per_sample_t) 32;
+#else
+  i2s_pin_config_t pin_config = {
+      .bck_io_num = 26,    // IIS_SCLK
+      .ws_io_num = 32,     // IIS_LCLK
+      .data_out_num = -1,  // IIS_DSIN
+      .data_in_num = 33,   // IIS_DOUT
+  };
+#endif
 
   esp_err_t ret = 0;
   ret = i2s_driver_install(i2s_port, &i2s_config, 0, NULL);
@@ -105,47 +123,51 @@ static void i2s_init(void) {
     ESP_LOGE(TAG, "Error in initializing dma buffer with 0");
   }
 }
+#endif
 
 static void CaptureSamples(void* arg) {
-    size_t bytes_read = i2s_bytes_to_read;
-  
-    i2s_init();
-  
-    while (1) {
-        /* read 100ms data at once from i2s */
-        i2s_read(i2s_port, (void*)g_i2s_read_buffer, i2s_bytes_to_read, &bytes_read, pdMS_TO_TICKS(100));
-  
-        if (bytes_read <= 0) {
-            ESP_LOGE(TAG, "Error in I2S read : %d", bytes_read);
-        } else {
-            if (bytes_read < i2s_bytes_to_read) {
-              ESP_LOGW(TAG, "Partial I2S read");
-            }
-            // rescale the data
-            for (int i = 0; i < bytes_read / 4; ++i) {
-              ((int16_t *) g_i2s_read_buffer)[i] = ((int32_t *) g_i2s_read_buffer)[i] >> 14;
-            }
-            bytes_read = bytes_read / 2;
-    
-            /* write bytes read by i2s into ring buffer */
-            int bytes_written = rb_write(g_audio_capture_buffer, (uint8_t*)g_i2s_read_buffer, bytes_read, pdMS_TO_TICKS(100));
-    
-            if (bytes_written != bytes_read) {
-              ESP_LOGI(TAG, "Could only write %d bytes out of %d", bytes_written, bytes_read);
-            }
-            /* update the timestamp (in ms) to let the model know that new data has
-             * arrived */
-            g_latest_audio_timestamp = g_latest_audio_timestamp + ((1000 * (bytes_written / 2)) / kAudioSampleFrequency);
-            // ESP_LOGI(TAG, "Updated timestamp: %ld", g_latest_audio_timestamp);
-    
-            if (bytes_written <= 0) {
-              ESP_LOGE(TAG, "Could Not Write in Ring Buffer: %d ", bytes_written);
-            } else if (bytes_written < bytes_read) {
-              ESP_LOGW(TAG, "Partial Write");
-            }
-        }
+#if NO_I2S_SUPPORT
+  ESP_LOGE(TAG, "i2s support not available on C3 chip for IDF < 4.4.0");
+#else
+  size_t bytes_read = i2s_bytes_to_read;
+  i2s_init();
+  while (1) {
+    /* read 100ms data at once from i2s */
+    i2s_read(i2s_port, (void*)g_i2s_read_buffer, i2s_bytes_to_read,
+             &bytes_read, pdMS_TO_TICKS(100));
+
+    if (bytes_read <= 0) {
+      ESP_LOGE(TAG, "Error in I2S read : %d", bytes_read);
+    } else {
+      if (bytes_read < i2s_bytes_to_read) {
+        ESP_LOGW(TAG, "Partial I2S read");
+      }
+#if CONFIG_IDF_TARGET_ESP32S3
+      // rescale the data
+      for (int i = 0; i < bytes_read / 4; ++i) {
+        ((int16_t *) g_i2s_read_buffer)[i] = ((int32_t *) g_i2s_read_buffer)[i] >> 14;
+      }
+      bytes_read = bytes_read / 2;
+#endif
+      /* write bytes read by i2s into ring buffer */
+      int bytes_written = rb_write(g_audio_capture_buffer,
+                                   (uint8_t*)g_i2s_read_buffer, bytes_read, pdMS_TO_TICKS(100));
+      if (bytes_written != bytes_read) {
+        ESP_LOGI(TAG, "Could only write %d bytes out of %d", bytes_written, bytes_read);
+      }
+      /* update the timestamp (in ms) to let the model know that new data has
+       * arrived */
+      g_latest_audio_timestamp = g_latest_audio_timestamp +
+          ((1000 * (bytes_written / 2)) / kAudioSampleFrequency);
+      if (bytes_written <= 0) {
+        ESP_LOGE(TAG, "Could Not Write in Ring Buffer: %d ", bytes_written);
+      } else if (bytes_written < bytes_read) {
+        ESP_LOGW(TAG, "Partial Write");
+      }
     }
-    vTaskDelete(NULL);
+  }
+#endif
+  vTaskDelete(NULL);
 }
 
 TfLiteStatus InitAudioRecording() {

@@ -89,8 +89,8 @@ TfLiteStatus InitializeMicroFeatures() {
     return kTfLiteError;
   }
 
-  MicroPrintf("AudioPreprocessor model arena size = %u",
-              interpreter->arena_used_bytes());
+  // MicroPrintf("AudioPreprocessor model arena size = %u",
+  //             interpreter.arena_used_bytes());
 
   return kTfLiteOk;
 }
