@@ -169,36 +169,34 @@ void loop() {
 
   // Obtain a pointer to the output tensor
   TfLiteTensor* output = interpreter->output(0);
-#if 1 // using simple argmax instead of recognizer
+#if 0 // using simple argmax instead of recognizer
   float output_scale = output->params.scale;
   int output_zero_point = output->params.zero_point;
   int max_idx = 0;
   float max_result = 0.0;
   // Dequantize output values and find the max
   for (int i = 0; i < kCategoryCount; i++) {
-    float current_result =
-        (tflite::GetTensorData<int8_t>(output)[i] - output_zero_point) *
-        output_scale;
+    float current_result = (tflite::GetTensorData<int8_t>(output)[i] - output_zero_point) * output_scale;
     if (current_result > max_result) {
       max_result = current_result; // update max result
       max_idx = i; // update category
     }
   }
+
   if (max_result > 0.8f) {
-    MicroPrintf("Detected %7s, score: %.2f", kCategoryLabels[max_idx],
-        static_cast<double>(max_result));
-  }
+    MicroPrintf("Detected %7s, score: %.2f", kCategoryLabels[max_idx], static_cast<double>(max_result));
+  }  
 #else
   // Determine whether a command was recognized based on the output of inference
   const char* found_command = nullptr;
   float score = 0;
   bool is_new_command = false;
-  TfLiteStatus process_status = recognizer->ProcessLatestResults(
-      output, current_time, &found_command, &score, &is_new_command);
+  TfLiteStatus process_status = recognizer->ProcessLatestResults(output, current_time, &found_command, &score, &is_new_command);
   if (process_status != kTfLiteOk) {
     MicroPrintf("RecognizeCommands::ProcessLatestResults() failed");
     return;
   }
+  ESP_LOGI(TAG, "Detected %7s, score: %.2f", found_command, static_cast<double>(score));
   // Do something based on the recognized command. The default implementation
   // just prints to the error console, but you should replace this with your
   // own function for a real application.

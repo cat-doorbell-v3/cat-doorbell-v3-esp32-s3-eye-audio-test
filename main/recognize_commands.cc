@@ -14,8 +14,11 @@ limitations under the License.
 ==============================================================================*/
 
 #include "recognize_commands.h"
+#include "esp_log.h"
 
 #include <limits>
+
+#define TAG "recognize_commands"
 
 RecognizeCommands::RecognizeCommands(int32_t average_window_duration_ms,
                                      float detection_threshold,
@@ -33,14 +36,13 @@ RecognizeCommands::RecognizeCommands(int32_t average_window_duration_ms,
 TfLiteStatus RecognizeCommands::ProcessLatestResults(
     const TfLiteTensor* latest_results, const int32_t current_time_ms,
     const char** found_command, float* score, bool* is_new_command) {
+
   if ((latest_results->dims->size != 2) ||
       (latest_results->dims->data[0] != 1) ||
       (latest_results->dims->data[1] != kCategoryCount)) {
     MicroPrintf(
-        "The results for recognition should contain %d elements, but there are "
-        "%d in an %d-dimensional shape",
-        kCategoryCount, latest_results->dims->data[1],
-        latest_results->dims->size);
+        "The results for recognition should contain %d elements, but there are %d in an %d-dimensional shape", 
+        kCategoryCount, latest_results->dims->data[1], latest_results->dims->size);
     return kTfLiteError;
   }
 
