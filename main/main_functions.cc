@@ -169,7 +169,7 @@ void loop() {
 
   // Obtain a pointer to the output tensor
   TfLiteTensor* output = interpreter->output(0);
-#if 0 // using simple argmax instead of recognizer
+#if 1 // using simple argmax instead of recognizer
   float output_scale = output->params.scale;
   int output_zero_point = output->params.zero_point;
   int max_idx = 0;
