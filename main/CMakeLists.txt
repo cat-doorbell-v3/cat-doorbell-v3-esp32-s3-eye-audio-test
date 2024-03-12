@@ -14,7 +14,7 @@ idf_component_register(
         command_responder.cc
         micro_features_generator.cc 
         ringbuf.c
-    PRIV_REQUIRES spi_flash driver esp_timer test_data 
+    PRIV_REQUIRES spi_flash driver esp_timer 
     INCLUDE_DIRS ".")
 
     # Reduce the level of paranoia to be able to compile sources
