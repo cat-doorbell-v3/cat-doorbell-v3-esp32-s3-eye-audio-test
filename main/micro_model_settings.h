@@ -36,8 +36,8 @@ constexpr int kFeatureDurationMs = 30;
 
 constexpr int kCategoryCount = 3;
 constexpr const char* kCategoryLabels[kCategoryCount] = { 
-    "unknown",
     "meow",
+    "unknown",
     "silence"
     };
 
