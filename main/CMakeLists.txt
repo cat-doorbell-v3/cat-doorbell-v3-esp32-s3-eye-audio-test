@@ -11,11 +11,15 @@ idf_component_register(
         feature_provider.cc
         model.cc
         recognize_commands.cc 
-        command_responder.cc
         micro_features_generator.cc 
         ringbuf.c
-    PRIV_REQUIRES spi_flash driver esp_timer 
-    INCLUDE_DIRS ".")
+    PRIV_REQUIRES 
+        spi_flash 
+        driver 
+        esp_timer 
+    INCLUDE_DIRS 
+        "."
+)
 
     # Reduce the level of paranoia to be able to compile sources
 target_compile_options(${COMPONENT_LIB} PRIVATE
