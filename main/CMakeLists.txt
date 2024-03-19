@@ -9,7 +9,7 @@ idf_component_register(
         main_functions.cc 
         audio_provider.cc 
         feature_provider.cc
-        model.cc
+        eml_meow.c
         recognize_commands.cc 
         micro_features_generator.cc 
         ringbuf.c
@@ -19,6 +19,7 @@ idf_component_register(
         esp_timer 
     INCLUDE_DIRS 
         "."
+        "/Users/tennis/src/emlearn/emlearn"
 )
 
     # Reduce the level of paranoia to be able to compile sources
