@@ -16,6 +16,7 @@ limitations under the License.
 #include <algorithm>
 #include <cstdint>
 #include <iterator>
+#include <cmath>
 #include "esp_log.h"
 
 #include "main_functions.h"
@@ -24,6 +25,7 @@ limitations under the License.
 #include "feature_provider.h"
 #include "micro_model_settings.h"
 #include "model.h"
+#include "eml_meow.h"
 #include "recognize_commands.h"
 #include "tensorflow/lite/micro/system_setup.h"
 #include "tensorflow/lite/schema/schema_generated.h"
@@ -52,8 +54,16 @@ int8_t feature_buffer[kFeatureElementCount];
 int8_t* model_input_buffer = nullptr;
 }  // namespace
 
+void convert_int8_to_float(int8_t* input_buffer, float* output_buffer, size_t length) {
+  for (size_t i = 0; i < length; ++i) {
+    // Example conversion, assuming the input range is [-128, 127] and needs to be normalized to [-1.0, 1.0]
+    output_buffer[i] = input_buffer[i] / 128.0f;
+  }
+}
+
 // The name of this function is important for Arduino compatibility.
 void setup() {
+#if 0
   // Map the model into a usable data structure. This doesn't involve any
   // copying or parsing, it's a very lightweight operation.
   model = tflite::GetModel(g_model);
@@ -123,7 +133,7 @@ void setup() {
     return;
   }
   model_input_buffer = tflite::GetTensorData<int8_t>(model_input);
-
+#endif
   // Prepare to access the audio spectrograms from a microphone or other source
   // that will provide the inputs to the neural network.
   // NOLINTNEXTLINE(runtime-global-variables)
@@ -131,8 +141,8 @@ void setup() {
                                                  feature_buffer);
   feature_provider = &static_feature_provider;
 
-  static RecognizeCommands static_recognizer;
-  recognizer = &static_recognizer;
+  // static RecognizeCommands static_recognizer;
+  // recognizer = &static_recognizer;
 
   previous_time = 0;
 }
@@ -150,10 +160,18 @@ void loop() {
   previous_time = current_time;
   // If no new audio samples have been received since last time, don't bother
   // running the network model.
-  if (how_many_new_slices == 0) {
-    return;
+  if (how_many_new_slices > 0) {
+    // Allocate temporary buffer for converted features
+    float float_feature_buffer[kFeatureElementCount];
+    convert_int8_to_float(feature_buffer, float_feature_buffer, kFeatureElementCount);
+
+    int32_t meow_prediction = meow_predict(float_feature_buffer, kFeatureElementCount);
+    if (meow_prediction) {
+      MicroPrintf("Meow detected");
+    }
   }
 
+#if 0
   // Copy feature buffer to input tensor
   for (int i = 0; i < kFeatureElementCount; i++) {
     model_input_buffer[i] = feature_buffer[i];
@@ -200,5 +218,6 @@ void loop() {
   // just prints to the error console, but you should replace this with your
   // own function for a real application.
   RespondToCommand(current_time, found_command, score, is_new_command);
+#endif
 #endif
 }
