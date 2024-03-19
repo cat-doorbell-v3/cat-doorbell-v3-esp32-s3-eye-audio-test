@@ -15,6 +15,7 @@ limitations under the License.
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <iterator>
 #include <cmath>
 #include "esp_log.h"
@@ -54,12 +55,19 @@ int8_t feature_buffer[kFeatureElementCount];
 int8_t* model_input_buffer = nullptr;
 }  // namespace
 
-void convert_int8_to_float(int8_t* input_buffer, float* output_buffer, size_t length) {
-  for (size_t i = 0; i < length; ++i) {
-    // Example conversion, assuming the input range is [-128, 127] and needs to be normalized to [-1.0, 1.0]
-    output_buffer[i] = input_buffer[i] / 128.0f;
-  }
+void convert_int8_to_float(int8_t* input_buffer, float** output_buffer, size_t length) {
+    *output_buffer = (float*)malloc(length * sizeof(float)); // Allocate memory on the heap
+    if (*output_buffer == NULL) {
+        // Handle memory allocation failure
+        return;
+    }
+
+    for (size_t i = 0; i < length; ++i) {
+        // Convert and normalize the input as before
+        (*output_buffer)[i] = input_buffer[i] / 128.0f;
+    }
 }
+
 
 // The name of this function is important for Arduino compatibility.
 void setup() {
@@ -133,16 +141,17 @@ void setup() {
     return;
   }
   model_input_buffer = tflite::GetTensorData<int8_t>(model_input);
-#endif
   // Prepare to access the audio spectrograms from a microphone or other source
   // that will provide the inputs to the neural network.
   // NOLINTNEXTLINE(runtime-global-variables)
+
+#endif
   static FeatureProvider static_feature_provider(kFeatureElementCount,
                                                  feature_buffer);
   feature_provider = &static_feature_provider;
 
-  // static RecognizeCommands static_recognizer;
-  // recognizer = &static_recognizer;
+  static RecognizeCommands static_recognizer;
+  recognizer = &static_recognizer;
 
   previous_time = 0;
 }
@@ -161,17 +170,23 @@ void loop() {
   // If no new audio samples have been received since last time, don't bother
   // running the network model.
   if (how_many_new_slices > 0) {
-    // Allocate temporary buffer for converted features
-    float float_feature_buffer[kFeatureElementCount];
-    convert_int8_to_float(feature_buffer, float_feature_buffer, kFeatureElementCount);
+    float* float_feature_buffer = NULL;
+    convert_int8_to_float(feature_buffer, &float_feature_buffer, kFeatureElementCount);
+    
+    if (float_feature_buffer != NULL) {
+        int32_t meow_prediction = meow_predict(float_feature_buffer, kFeatureElementCount);
+        MicroPrintf("Meow prediction: %d", meow_prediction);
+        if (meow_prediction) {
+          MicroPrintf("Meow detected");
+        }
 
-    int32_t meow_prediction = meow_predict(float_feature_buffer, kFeatureElementCount);
-    if (meow_prediction) {
-      MicroPrintf("Meow detected");
+        free(float_feature_buffer); // Deallocate the buffer after use
+    } else {
+        MicroPrintf("Memory allocation for feature buffer failed");
     }
   }
-
 #if 0
+
   // Copy feature buffer to input tensor
   for (int i = 0; i < kFeatureElementCount; i++) {
     model_input_buffer[i] = feature_buffer[i];

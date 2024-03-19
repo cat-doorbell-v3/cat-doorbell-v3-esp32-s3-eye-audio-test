@@ -10,6 +10,7 @@ idf_component_register(
         audio_provider.cc 
         feature_provider.cc
         eml_meow.c
+        model.cc
         recognize_commands.cc 
         micro_features_generator.cc 
         ringbuf.c
