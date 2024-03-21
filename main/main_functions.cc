@@ -150,8 +150,8 @@ void setup() {
                                                  feature_buffer);
   feature_provider = &static_feature_provider;
 
-  static RecognizeCommands static_recognizer;
-  recognizer = &static_recognizer;
+  // static RecognizeCommands static_recognizer;
+  // recognizer = &static_recognizer;
 
   previous_time = 0;
 }
@@ -176,10 +176,6 @@ void loop() {
     if (float_feature_buffer != NULL) {
         int32_t meow_prediction = meow_predict(float_feature_buffer, kFeatureElementCount);
         MicroPrintf("Meow prediction: %d", meow_prediction);
-        if (meow_prediction) {
-          MicroPrintf("Meow detected");
-        }
-
         free(float_feature_buffer); // Deallocate the buffer after use
     } else {
         MicroPrintf("Memory allocation for feature buffer failed");
