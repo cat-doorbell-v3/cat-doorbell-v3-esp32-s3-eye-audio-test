@@ -15,6 +15,7 @@ limitations under the License.
 
 #ifndef TENSORFLOW_LITE_MICRO_EXAMPLES_MICRO_SPEECH_MICRO_MODEL_SETTINGS_H_
 #define TENSORFLOW_LITE_MICRO_EXAMPLES_MICRO_SPEECH_MICRO_MODEL_SETTINGS_H_
+
 constexpr int kAudioSampleFrequency = 16000;
 constexpr int kMaxAudioSampleSize = 480;
 constexpr int kFeatureSize = 40;
@@ -25,6 +26,5 @@ constexpr int kFeatureDurationMs = 30;
 
 constexpr int kCategoryCount = 3;
 constexpr const char* kCategoryLabels[kCategoryCount] = {"silence", "unknown", "meow"};
-
 
 #endif  // TENSORFLOW_LITE_MICRO_EXAMPLES_MICRO_SPEECH_MICRO_MODEL_SETTINGS_H_
